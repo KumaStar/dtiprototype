@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Knowledge Graph Generator</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    /* ── Reset & base ─────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3350;
+      --accent: #6366f1;
+      --accent2: #8b5cf6;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --radius: 12px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.5);
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ───────────────────────────────────────────── */
+    header {
+      padding: 18px 32px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, #fff, #94a3b8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header-badge {
+      margin-left: auto;
+      font-size: 0.72rem;
+      padding: 4px 10px;
+      background: rgba(99,102,241,0.15);
+      border: 1px solid rgba(99,102,241,0.3);
+      border-radius: 20px;
+      color: #818cf8;
+    }
+
+    /* ── Layout ───────────────────────────────────────────── */
+    .layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      height: calc(100vh - 61px);
+    }
+
+    /* ── Sidebar ──────────────────────────────────────────── */
+    .sidebar {
+      width: 340px;
+      min-width: 300px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    .sidebar-inner {
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .section-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    /* ── Upload zone ──────────────────────────────────────── */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 28px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(99,102,241,0.06);
+    }
+
+    .upload-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+
+    .upload-icon { font-size: 2rem; margin-bottom: 10px; }
+
+    .upload-zone p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .upload-zone strong { color: var(--accent); }
+
+    .file-info {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      background: rgba(16,185,129,0.1);
+      border: 1px solid rgba(16,185,129,0.25);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.82rem;
+    }
+
+    .file-info.show { display: flex; }
+    .file-info .file-icon { font-size: 1.2rem; }
+    .file-info .file-name { flex: 1; color: var(--success); font-weight: 500; word-break: break-all; }
+    .file-info .remove-btn { cursor: pointer; color: var(--text-muted); font-size: 1rem; flex-shrink: 0; }
+    .file-info .remove-btn:hover { color: var(--danger); }
+
+    /* ── Inputs ───────────────────────────────────────────── */
+    .input-group { display: flex; flex-direction: column; gap: 6px; }
+
+    label {
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    input[type="text"], textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: 0.88rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus, textarea:focus {
+      border-color: var(--accent);
+    }
+
+    textarea { resize: vertical; min-height: 70px; }
+
+    .hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+
+    /* ── Button ───────────────────────────────────────────── */
+    .btn-generate {
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none;
+      border-radius: var(--radius);
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: opacity 0.2s, transform 0.1s;
+      letter-spacing: 0.01em;
+    }
+
+    .btn-generate:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+    .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      display: none;
+    }
+    .spinner.show { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Graph stats ──────────────────────────────────────── */
+    .graph-stats {
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .graph-stats.show { display: flex; }
+
+    .graph-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.4;
+    }
+
+    .stat-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .stat-chip {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 8px;
+      text-align: center;
+    }
+
+    .stat-chip .num {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .stat-chip .lbl {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* ── Legend ───────────────────────────────────────────── */
+    .legend { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .legend-item {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      background: var(--surface2);
+      border-radius: 20px;
+      padding: 3px 9px 3px 6px;
+      border: 1px solid var(--border);
+    }
+
+    .legend-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ── Controls ─────────────────────────────────────────── */
+    .controls {
+      display: flex; gap: 6px; flex-wrap: wrap;
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 0.78rem;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-sm:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    /* ── Graph canvas ─────────────────────────────────────── */
+    .graph-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .graph-toolbar {
+      padding: 12px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .graph-toolbar .sep { width: 1px; height: 16px; background: var(--border); }
+
+    #graph-svg-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #graph-svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ── Empty state ──────────────────────────────────────── */
+    .empty-state {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .empty-state-icon {
+      width: 80px; height: 80px;
+      border-radius: 20px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+    }
+
+    .empty-state h2 { font-size: 1rem; color: var(--text); font-weight: 600; }
+    .empty-state p { font-size: 0.82rem; text-align: center; max-width: 280px; line-height: 1.6; }
+
+    /* ── Tooltip ──────────────────────────────────────────── */
+    .tooltip {
+      position: fixed;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      pointer-events: none;
+      max-width: 240px;
+      z-index: 1000;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    .tooltip.show { opacity: 1; }
+
+    .tooltip-title {
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .tooltip-category {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+
+    .tooltip-desc {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* ── Edge tooltip ─────────────────────────────────────── */
+    .edge-tooltip {
+      position: fixed;
+      background: rgba(26,29,39,0.95);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      pointer-events: none;
+      z-index: 999;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    .edge-tooltip.show { opacity: 1; }
+
+    /* ── Error banner ─────────────────────────────────────── */
+    .error-banner {
+      display: none;
+      padding: 12px 16px;
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 8px;
+      font-size: 0.82rem;
+      color: #fca5a5;
+      line-height: 1.5;
+    }
+
+    .error-banner.show { display: block; }
+
+    /* ── API key alert ────────────────────────────────────── */
+    .api-alert {
+      display: none;
+      padding: 12px 14px;
+      background: rgba(245,158,11,0.1);
+      border: 1px solid rgba(245,158,11,0.3);
+      border-radius: 8px;
+      font-size: 0.8rem;
+      color: #fcd34d;
+      line-height: 1.6;
+    }
+
+    .api-alert.show { display: block; }
+    .api-alert a { color: #fbbf24; }
+
+    /* ── Graph SVG styles ─────────────────────────────────── */
+    .node circle {
+      stroke-width: 2.5;
+      cursor: grab;
+      transition: filter 0.2s;
+    }
+
+    .node circle:active { cursor: grabbing; }
+
+    .node circle:hover, .node.highlighted circle {
+      filter: brightness(1.3) drop-shadow(0 0 8px currentColor);
+    }
+
+    .node text {
+      font-size: 11px;
+      fill: #e2e8f0;
+      pointer-events: none;
+      text-anchor: middle;
+      dominant-baseline: middle;
+    }
+
+    .node .importance-ring {
+      fill: none;
+      opacity: 0.3;
+    }
+
+    .link {
+      stroke: rgba(99,102,241,0.35);
+      stroke-width: 1.5;
+      fill: none;
+      transition: stroke-opacity 0.2s;
+    }
+
+    .link:hover { stroke: rgba(99,102,241,0.7); }
+
+    .link-label {
+      font-size: 9px;
+      fill: rgba(148,163,184,0.7);
+      pointer-events: none;
+      text-anchor: middle;
+    }
+
+    .link.highlighted { stroke: rgba(99,102,241,0.9); stroke-width: 2.5; }
+
+    /* ── Scrollbar ────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo"></div>
+  <h1>AI Knowledge Graph Generator</h1>
+</header>
+
+<div class="layout">
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <!-- API Key Alert -->
+      <div class="api-alert" id="apiAlert">
+        <strong>API key not configured.</strong><br>
+        Add <code>GEMINI_API_KEY</code> to your <code>.env</code> file.<br>
+        Get a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a>
+      </div>
+
+      <!-- PDF Upload -->
+      <div>
+        <div class="section-label">1 · Upload PDF</div>
+        <div class="upload-zone" id="uploadZone">
+          <input type="file" id="pdfInput" accept=".pdf" />
+          <div class="upload-icon" style="width:36px;height:36px;background:var(--surface2);border-radius:8px;margin:0 auto 10px;"></div>
+          <p><strong>Click to upload</strong> or drag & drop<br>PDF files only · max 20 MB</p>
+        </div>
+        <div class="file-info" id="fileInfo">
+          <span class="file-icon" style="font-size:1rem">PDF</span>
+          <span class="file-name" id="fileName"></span>
+          <span class="remove-btn" id="removeFile" title="Remove file">✕</span>
+        </div>
+      </div>
+
+      <!-- Query -->
+      <div class="input-group">
+        <div class="section-label">2 · Enter Query</div>
+        <input
+          type="text"
+          id="queryInput"
+          placeholder="e.g. machine learning concepts"
+          maxlength="200"
+        />
+        <span class="hint">Focus the AI on specific topics, themes, or questions from the document.</span>
+      </div>
+
+      <!-- Error -->
+      <div class="error-banner" id="errorBanner"></div>
+
+      <!-- Generate Button -->
+      <button class="btn-generate" id="generateBtn" disabled>
+        <div class="spinner" id="spinner"></div>
+        <span id="btnText">Generate Knowledge Graph</span>
+      </button>
+
+      <!-- Graph Stats (hidden until graph is generated) -->
+      <div class="graph-stats" id="graphStats">
+        <div class="section-label">Graph Overview</div>
+        <div class="graph-title" id="graphTitle"></div>
+        <div class="stat-row">
+          <div class="stat-chip">
+            <div class="num" id="nodeCount">0</div>
+            <div class="lbl">Concepts</div>
+          </div>
+          <div class="stat-chip">
+            <div class="num" id="edgeCount">0</div>
+            <div class="lbl">Relationships</div>
+          </div>
+          <div class="stat-chip">
+            <div class="num" id="clusterCount">0</div>
+            <div class="lbl">Categories</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-label" style="margin-bottom:8px">Categories</div>
+          <div class="legend" id="legend"></div>
+        </div>
+
+        <div>
+          <div class="section-label" style="margin-bottom:8px">Graph Controls</div>
+          <div class="controls">
+            <button class="btn-sm" id="resetZoom">Reset View</button>
+            <button class="btn-sm" id="freezeBtn">Freeze</button>
+            <button class="btn-sm" id="downloadBtn">Export SVG</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- ── Graph Area ── -->
+  <main class="graph-area">
+    <div class="graph-toolbar" id="graphToolbar">
+      <span>Scroll to zoom · Drag nodes · Click to highlight connections</span>
+      <div class="sep"></div>
+      <span id="hoverInfo">Hover a node for details</span>
+    </div>
+
+    <div id="graph-svg-container">
+      <!-- Empty state -->
+      <div class="empty-state" id="emptyState">
+        <div class="empty-state-icon" style="font-size:1rem;color:var(--text-muted)">KG</div>
+        <h2>No Graph Yet</h2>
+        <p>Upload a PDF and enter a query to generate an interactive knowledge graph from your document.</p>
+      </div>
+
+      <svg id="graph-svg"></svg>
+    </div>
+  </main>
+</div>
+
+<!-- Tooltips -->
+<div class="tooltip" id="nodeTooltip">
+  <div class="tooltip-title" id="ttTitle"></div>
+  <div class="tooltip-category" id="ttCategory"></div>
+  <div class="tooltip-desc" id="ttDesc"></div>
+</div>
+<div class="edge-tooltip" id="edgeTooltip"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  State
+// ════════════════════════════════════════════════════════════
+let selectedFile = null;
+let simulation = null;
+let isFrozen = false;
+let graphData = null;
+
+// ════════════════════════════════════════════════════════════
+//  Category color palette
+// ════════════════════════════════════════════════════════════
+const CATEGORY_COLORS = {
+  concept:   "#6366f1",
+  topic:     "#8b5cf6",
+  entity:    "#0ea5e9",
+  process:   "#10b981",
+  attribute: "#f59e0b",
+  theory:    "#ec4899",
+  method:    "#14b8a6",
+  tool:      "#f97316",
+  person:    "#84cc16",
+  place:     "#a78bfa",
+  default:   "#94a3b8",
+};
+
+function getColor(category) {
+  return CATEGORY_COLORS[(category || "").toLowerCase()] || CATEGORY_COLORS.default;
+}
+
+// ════════════════════════════════════════════════════════════
+//  Upload logic
+// ════════════════════════════════════════════════════════════
+const pdfInput = document.getElementById("pdfInput");
+const uploadZone = document.getElementById("uploadZone");
+const fileInfo = document.getElementById("fileInfo");
+const fileName = document.getElementById("fileName");
+const removeFile = document.getElementById("removeFile");
+const generateBtn = document.getElementById("generateBtn");
+const queryInput = document.getElementById("queryInput");
+
+function setFile(file) {
+  if (!file || file.type !== "application/pdf") {
+    showError("Please upload a PDF file.");
+    return;
+  }
+  if (file.size > 20 * 1024 * 1024) {
+    showError("File is too large (max 20 MB).");
+    return;
+  }
+  selectedFile = file;
+  fileName.textContent = file.name;
+  fileInfo.classList.add("show");
+  uploadZone.style.display = "none";
+  clearError();
+  updateBtn();
+}
+
+pdfInput.addEventListener("change", (e) => {
+  if (e.target.files[0]) setFile(e.target.files[0]);
+});
+
+removeFile.addEventListener("click", () => {
+  selectedFile = null;
+  pdfInput.value = "";
+  fileInfo.classList.remove("show");
+  uploadZone.style.display = "";
+  updateBtn();
+});
+
+// Drag & drop
+uploadZone.addEventListener("dragover", (e) => { e.preventDefault(); uploadZone.classList.add("drag-over"); });
+uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("drag-over"));
+uploadZone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  uploadZone.classList.remove("drag-over");
+  if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+});
+
+queryInput.addEventListener("input", updateBtn);
+
+function updateBtn() {
+  generateBtn.disabled = !selectedFile || !queryInput.value.trim();
+}
+
+// ════════════════════════════════════════════════════════════
+//  Error / loading helpers
+// ════════════════════════════════════════════════════════════
+function showError(msg) {
+  const el = document.getElementById("errorBanner");
+  el.textContent = msg;
+  el.classList.add("show");
+}
+function clearError() {
+  document.getElementById("errorBanner").classList.remove("show");
+}
+
+function setLoading(on) {
+  generateBtn.disabled = on;
+  document.getElementById("spinner").classList.toggle("show", on);
+  document.getElementById("btnText").textContent = on ? "Generating…" : "Generate Knowledge Graph";
+}
+
+// ════════════════════════════════════════════════════════════
+//  Check API key on load
+// ════════════════════════════════════════════════════════════
+(async function checkHealth() {
+  try {
+    const r = await fetch("/api/health");
+    const j = await r.json();
+    if (!j.apiKeyConfigured) {
+      document.getElementById("apiAlert").classList.add("show");
+    }
+  } catch {}
+})();
+
+// ════════════════════════════════════════════════════════════
+//  Generate
+// ════════════════════════════════════════════════════════════
+generateBtn.addEventListener("click", async () => {
+  if (!selectedFile || !queryInput.value.trim()) return;
+  clearError();
+  setLoading(true);
+
+  try {
+    const formData = new FormData();
+    formData.append("pdf", selectedFile);
+    formData.append("query", queryInput.value.trim());
+
+    const response = await fetch("/api/generate", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Server error");
+    }
+
+    graphData = data.graph;
+    renderGraph(graphData);
+
+  } catch (err) {
+    showError("❌ " + (err.message || "Unknown error. Check the server console."));
+  } finally {
+    setLoading(false);
+  }
+});
+
+// ════════════════════════════════════════════════════════════
+//  D3 Graph
+// ════════════════════════════════════════════════════════════
+function renderGraph(data) {
+  const { nodes, edges, title } = data;
+  document.getElementById("emptyState").style.display = "none";
+
+  // Update stats
+  const categories = [...new Set(nodes.map(n => n.category || "concept"))];
+  document.getElementById("graphTitle").textContent = title || "Knowledge Graph";
+  document.getElementById("nodeCount").textContent = nodes.length;
+  document.getElementById("edgeCount").textContent = edges.length;
+  document.getElementById("clusterCount").textContent = categories.length;
+  document.getElementById("graphStats").classList.add("show");
+
+  // Build legend
+  const legend = document.getElementById("legend");
+  legend.innerHTML = categories.map(cat =>
+    `<div class="legend-item">
+      <div class="legend-dot" style="background:${getColor(cat)}"></div>
+      ${cat}
+    </div>`
+  ).join("");
+
+  // Prepare D3 data (deep clone to avoid mutation issues)
+  const d3Nodes = nodes.map(n => ({ ...n }));
+  const nodeById = Object.fromEntries(d3Nodes.map(n => [n.id, n]));
+  const d3Links = edges
+    .filter(e => nodeById[e.source] && nodeById[e.target])
+    .map(e => ({ ...e }));
+
+  // Clear previous graph
+  const svg = d3.select("#graph-svg");
+  svg.selectAll("*").remove();
+  if (simulation) simulation.stop();
+  isFrozen = false;
+  document.getElementById("freezeBtn").textContent = "❄ Freeze";
+
+  const container = document.getElementById("graph-svg-container");
+  const W = container.clientWidth;
+  const H = container.clientHeight;
+
+  // Zoom
+  const zoomG = svg.append("g").attr("class", "zoom-g");
+  const zoom = d3.zoom()
+    .scaleExtent([0.1, 4])
+    .on("zoom", (e) => zoomG.attr("transform", e.transform));
+  svg.call(zoom);
+
+  // Arrow marker
+  const defs = svg.append("defs");
+  defs.append("marker")
+    .attr("id", "arrow")
+    .attr("viewBox", "0 -4 10 8")
+    .attr("refX", 22)
+    .attr("refY", 0)
+    .attr("markerWidth", 6)
+    .attr("markerHeight", 6)
+    .attr("orient", "auto")
+    .append("path")
+    .attr("d", "M0,-4L10,0L0,4")
+    .attr("fill", "rgba(99,102,241,0.6)");
+
+  // Node radius helper — declared before simulation so it's available immediately
+  const nodeRadius = d => 10 + (d.importance || 3) * 3;
+
+  // Force simulation
+  simulation = d3.forceSimulation(d3Nodes)
+    .force("link", d3.forceLink(d3Links).id(d => d.id).distance(d => 180 + (1 - (d.strength || 0.5)) * 140))
+    .force("charge", d3.forceManyBody().strength(-600))
+    .force("center", d3.forceCenter(W / 2, H / 2))
+    .force("collision", d3.forceCollide().radius(d => nodeRadius(d) + 30))
+    .force("x", d3.forceX(W / 2).strength(0.02))
+    .force("y", d3.forceY(H / 2).strength(0.02));
+
+  // Links
+  const link = zoomG.append("g").selectAll("line")
+    .data(d3Links)
+    .join("line")
+    .attr("class", "link")
+    .attr("marker-end", "url(#arrow)")
+    .attr("stroke-width", d => 1 + (d.strength || 0.5) * 1.5);
+
+  // Edge labels
+  const edgeLabel = zoomG.append("g").selectAll("text")
+    .data(d3Links)
+    .join("text")
+    .attr("class", "link-label")
+    .text(d => d.label);
+
+  // Edge hover hit area (wider, invisible)
+  const linkHit = zoomG.append("g").selectAll("line")
+    .data(d3Links)
+    .join("line")
+    .style("stroke", "transparent")
+    .style("stroke-width", 14)
+    .style("cursor", "default")
+    .on("mouseover", (e, d) => {
+      showEdgeTooltip(e, `${d.source.label || d.source.id}  →  ${d.target.label || d.target.id}: "${d.label}"`);
+    })
+    .on("mouseout", hideEdgeTooltip);
+
+  // Nodes
+  const node = zoomG.append("g").selectAll("g")
+    .data(d3Nodes)
+    .join("g")
+    .attr("class", "node")
+    .call(d3.drag()
+      .on("start", (e, d) => {
+        if (!isFrozen && !e.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x; d.fy = d.y;
+      })
+      .on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; })
+      .on("end", (e, d) => {
+        if (!isFrozen && !e.active) simulation.alphaTarget(0);
+        if (!isFrozen) { d.fx = null; d.fy = null; }
+      })
+    )
+    .on("mouseover", (e, d) => {
+      showNodeTooltip(e, d);
+      document.getElementById("hoverInfo").textContent = d.label;
+      highlightConnections(d, link, node);
+    })
+    .on("mouseout", () => {
+      hideNodeTooltip();
+      document.getElementById("hoverInfo").textContent = "Hover a node for details";
+      clearHighlight(link, node);
+    })
+    .on("click", (e, d) => {
+      e.stopPropagation();
+      if (d.fx !== null && d.fx !== undefined && isFrozen === false) {
+        d.fx = null; d.fy = null;
+      } else {
+        d.fx = d.x; d.fy = d.y;
+      }
+    });
+
+  // Importance ring
+  node.append("circle")
+    .attr("class", "importance-ring")
+    .attr("r", d => nodeRadius(d) + 5)
+    .attr("stroke", d => getColor(d.category))
+    .attr("stroke-width", 2)
+    .attr("fill", "none");
+
+  // Main circle
+  node.append("circle")
+    .attr("r", nodeRadius)
+    .attr("fill", d => getColor(d.category))
+    .attr("stroke", d => d3.color(getColor(d.category)).brighter(0.5))
+    .attr("fill-opacity", 0.85);
+
+  // Label
+  node.append("text")
+    .attr("dy", d => nodeRadius(d) + 14)
+    .attr("text-anchor", "middle")
+    .style("font-size", "10px")
+    .style("fill", "#cbd5e1")
+    .style("pointer-events", "none")
+    .text(d => d.label.length > 20 ? d.label.slice(0, 18) + "…" : d.label);
+
+  // Tick
+  simulation.on("tick", () => {
+    link
+      .attr("x1", d => d.source.x)
+      .attr("y1", d => d.source.y)
+      .attr("x2", d => d.target.x)
+      .attr("y2", d => d.target.y);
+
+    linkHit
+      .attr("x1", d => d.source.x)
+      .attr("y1", d => d.source.y)
+      .attr("x2", d => d.target.x)
+      .attr("y2", d => d.target.y);
+
+    edgeLabel
+      .attr("x", d => (d.source.x + d.target.x) / 2)
+      .attr("y", d => (d.source.y + d.target.y) / 2);
+
+    node.attr("transform", d => `translate(${d.x},${d.y})`);
+  });
+
+  // Reset zoom button
+  document.getElementById("resetZoom").onclick = () => {
+    svg.transition().duration(500).call(
+      zoom.transform,
+      d3.zoomIdentity.translate(0, 0).scale(1)
+    );
+  };
+
+  // Freeze button
+  document.getElementById("freezeBtn").onclick = () => {
+    isFrozen = !isFrozen;
+    document.getElementById("freezeBtn").textContent = isFrozen ? "Unfreeze" : "Freeze";
+    if (isFrozen) {
+      simulation.stop();
+      d3Nodes.forEach(d => { d.fx = d.x; d.fy = d.y; });
+    } else {
+      d3Nodes.forEach(d => { d.fx = null; d.fy = null; });
+      simulation.alpha(0.3).restart();
+    }
+  };
+
+  // Download SVG
+  document.getElementById("downloadBtn").onclick = () => {
+    const svgEl = document.getElementById("graph-svg");
+    const serializer = new XMLSerializer();
+    const svgStr = serializer.serializeToString(svgEl);
+    const blob = new Blob([svgStr], { type: "image/svg+xml" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "knowledge-graph.svg";
+    a.click();
+  };
+}
+
+// ── Highlighting ───────────────────────────────────────────
+function highlightConnections(d, link, node) {
+  const connectedIds = new Set([d.id]);
+  link.each(function(l) {
+    const src = l.source.id || l.source;
+    const tgt = l.target.id || l.target;
+    if (src === d.id || tgt === d.id) {
+      connectedIds.add(src);
+      connectedIds.add(tgt);
+    }
+  });
+
+  link.classed("highlighted", l =>
+    (l.source.id || l.source) === d.id || (l.target.id || l.target) === d.id
+  );
+
+  node.style("opacity", n => connectedIds.has(n.id) ? 1 : 0.2);
+}
+
+function clearHighlight(link, node) {
+  link.classed("highlighted", false);
+  node.style("opacity", 1);
+}
+
+// ── Tooltips ───────────────────────────────────────────────
+function showNodeTooltip(e, d) {
+  const tt = document.getElementById("nodeTooltip");
+  document.getElementById("ttTitle").textContent = d.label;
+  document.getElementById("ttCategory").textContent = d.category || "concept";
+  document.getElementById("ttDesc").textContent = d.description || "";
+  positionTooltip(tt, e);
+  tt.classList.add("show");
+}
+
+function hideNodeTooltip() {
+  document.getElementById("nodeTooltip").classList.remove("show");
+}
+
+function showEdgeTooltip(e, text) {
+  const tt = document.getElementById("edgeTooltip");
+  tt.textContent = text;
+  positionTooltip(tt, e);
+  tt.classList.add("show");
+}
+
+function hideEdgeTooltip() {
+  document.getElementById("edgeTooltip").classList.remove("show");
+}
+
+function positionTooltip(el, e) {
+  const pad = 14;
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  let x = e.clientX + pad;
+  let y = e.clientY + pad;
+  el.style.left = x + "px";
+  el.style.top = y + "px";
+
+  // Adjust if off-screen
+  requestAnimationFrame(() => {
+    const rect = el.getBoundingClientRect();
+    if (rect.right > W) el.style.left = (e.clientX - rect.width - pad) + "px";
+    if (rect.bottom > H) el.style.top = (e.clientY - rect.height - pad) + "px";
+  });
+}
+</script>
+</body>
+</html>
