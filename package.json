@@ -1,11 +1,12 @@
 {
   "name": "ai-knowledge-graph-generator",
   "version": "1.0.0",
-  "description": "AI-powered Knowledge Graph Generator using Gemini API",
+  "description": "Agentic Graph-RAG system for Dynamic Pedagogical Knowledge Recomposition & Adaptive Revision Intelligence",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node --watch server.js",
+    "test": "node --test"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
