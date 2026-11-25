@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Knowledge Graph Generator</title>
+  <title>Agentic Graph-RAG: Adaptive Revision Intelligence</title>
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <style>
     /* ── Reset & base ─────────────────────────────────────── */
@@ -490,12 +490,13 @@
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
   </style>
+  <link rel="stylesheet" href="study.css" />
 </head>
 <body>
 
 <header>
   <div class="logo"></div>
-  <h1>AI Knowledge Graph Generator</h1>
+  <h1>Agentic Graph-RAG · Pedagogical Knowledge Recomposition &amp; Adaptive Revision Intelligence</h1>
 </header>
 
 <div class="layout">
@@ -578,6 +579,8 @@
             <button class="btn-sm" id="downloadBtn">Export SVG</button>
           </div>
         </div>
+        <p class="muted" id="docStats"></p>
+        <p class="muted">Ring after a quiz: green mastered, amber developing, red weak.</p>
       </div>
 
     </div>
@@ -602,6 +605,39 @@
       <svg id="graph-svg"></svg>
     </div>
   </main>
+
+  <!-- ── Study panel ── -->
+  <aside class="study" id="studyPanel" aria-label="Study panel" hidden>
+    <div class="tabs" role="tablist">
+      <button role="tab" data-tab="ask" aria-controls="tab-ask" aria-selected="true">Ask</button>
+      <button role="tab" data-tab="learn" aria-controls="tab-learn" aria-selected="false">Learn</button>
+      <button role="tab" data-tab="revise" aria-controls="tab-revise" aria-selected="false">Revise</button>
+    </div>
+    <div class="study-body">
+      <section id="tab-ask" role="tabpanel">
+        <form class="row" id="askForm">
+          <input type="text" id="question" maxlength="500" placeholder="Ask about this document" aria-label="Question" />
+          <button class="btn-sm" id="askBtn">Ask</button>
+        </form>
+        <div id="askOut" aria-live="polite"></div>
+      </section>
+      <section id="tab-learn" role="tabpanel" hidden>
+        <label for="goal">I want to learn</label><select id="goal"></select>
+        <label for="level">Explain for</label>
+        <select id="level"><option value="beginner">A beginner</option><option value="exam">Exam preparation</option><option value="advanced">An advanced learner</option></select>
+        <div class="section-label">Learning path, in order</div>
+        <ol class="path" id="pathOut"></ol>
+        <div id="lessonOut" aria-live="polite"></div>
+      </section>
+      <section id="tab-revise" role="tabpanel" hidden>
+        <p class="muted" id="overall"></p>
+        <div class="section-label">Revise next</div>
+        <div class="next" id="nextUp"></div>
+        <button class="btn-sm" id="quizBtn">Start quiz</button>
+        <div id="quizOut"></div>
+      </section>
+    </div>
+  </aside>
 </div>
 
 <!-- Tooltips -->
@@ -753,7 +789,7 @@ generateBtn.addEventListener("click", async () => {
     }
 
     graphData = data.graph;
-    renderGraph(graphData);
+    openSession(data);
 
   } catch (err) {
     showError("❌ " + (err.message || "Unknown error. Check the server console."));
@@ -779,12 +815,15 @@ function renderGraph(data) {
 
   // Build legend
   const legend = document.getElementById("legend");
-  legend.innerHTML = categories.map(cat =>
-    `<div class="legend-item">
-      <div class="legend-dot" style="background:${getColor(cat)}"></div>
-      ${cat}
-    </div>`
-  ).join("");
+  legend.replaceChildren(...categories.map(cat => {
+    const item = document.createElement("div");
+    item.className = "legend-item";
+    const dot = document.createElement("div");
+    dot.className = "legend-dot";
+    dot.style.background = getColor(cat);
+    item.append(dot, cat);
+    return item;
+  }));
 
   // Prepare D3 data (deep clone to avoid mutation issues)
   const d3Nodes = nodes.map(n => ({ ...n }));
@@ -798,7 +837,7 @@ function renderGraph(data) {
   svg.selectAll("*").remove();
   if (simulation) simulation.stop();
   isFrozen = false;
-  document.getElementById("freezeBtn").textContent = "❄ Freeze";
+  document.getElementById("freezeBtn").textContent = "Freeze";
 
   const container = document.getElementById("graph-svg-container");
   const W = container.clientWidth;
@@ -1044,5 +1083,6 @@ function positionTooltip(el, e) {
   });
 }
 </script>
+<script src="study.js"></script>
 </body>
 </html>

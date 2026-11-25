@@ -1,23 +1,21 @@
-# AI Knowledge Graph Generator
+# Agentic Graph-RAG System for Dynamic Pedagogical Knowledge Recomposition & Adaptive Revision Intelligence
 
-An AI-powered tool that extracts concepts and relationships from PDF documents and visualizes them as an interactive knowledge graph.
+Turns a PDF into a concept graph, answers questions from it with page citations, rebuilds it as a learning path, and adapts revision to the student.
 
 ## Features
 
-- 📄 Upload PDF notes/documents
-- 🔍 Enter a custom query to focus the extraction
-- 🧠 Gemini AI extracts key concepts and their relationships
-- 🕸️ Interactive D3.js force-directed graph visualization
-- 🎨 Color-coded node clusters
-- 🖱️ Drag, zoom, and pan the graph
-- 📋 Hover tooltips with relationship details
+| Part | What it does | Code |
+|---|---|---|
+| Knowledge graph | Concepts, relations, difficulty and prerequisites, each linked to source passages | `lib/graph.js` |
+| Graph-RAG | Embeddings + BM25 (rank fusion), then one-hop graph expansion; invented citations are removed | `lib/retriever.js` |
+| Knowledge recomposition | Prerequisite-ordered path to any goal; lessons at three levels, building on mastered concepts | `lib/pedagogy.js`, `lib/prompts.js` |
+| Adaptive revision | Quizzes, Bayesian Knowledge Tracing, forgetting, spaced review, prerequisite-gap detection | `lib/pedagogy.js` |
 
-## Tech Stack
+**Next milestone:** an agent that chooses between retrieving, teaching, quizzing and revising. Today the student chooses the tab; only *what to revise next* is automatic.
 
-- **Backend**: Node.js + Express
-- **AI**: Google Gemini API (`gemini-3.1-flash`)
-- **PDF Parsing**: `pdf-parse`
-- **Frontend**: Vanilla HTML/CSS/JS + D3.js v7
+## Tech stack
+
+Node.js + Express, Gemini (`gemini-3.1-flash-lite`, `gemini-embedding-001`), pdf-parse, D3.js v7. When Gemini is overloaded the app retries, then falls back to other models. Override models with `GEMINI_MODEL`, `GEMINI_FALLBACK_MODELS` (comma-separated) and `GEMINI_EMBED_MODEL`.
 
 ## Setup
 
@@ -46,28 +44,18 @@ npm start
 
 Then open your browser at: **http://localhost:3000**
 
+Run the tests with `npm test` (no API key needed).
+
 ## Usage
 
-1. Click **"Upload PDF"** and select a PDF file (notes, research paper, textbook chapter, etc.)
-2. Enter a **query** to focus the knowledge extraction (e.g., "machine learning concepts", "key arguments", "main topics")
-3. Click **"Generate Knowledge Graph"**
-4. Explore the interactive graph — drag nodes, zoom in/out, hover for relationship details
+1. Upload a text-based PDF, enter a focus, and generate the graph.
+2. **Ask** questions. Concepts used are outlined on the graph; click a page tag to see its source.
+3. **Learn**: pick a goal and level, then open lessons in order.
+4. **Revise**: take the suggested quiz. Rings on the graph show mastery.
 
-## How It Works
+## Limits
 
-1. The PDF is parsed server-side using `pdf-parse`
-2. Extracted text + your query are sent to Gemini API
-3. Gemini identifies key concepts (nodes) and their relationships (edges)
-4. The structured JSON is returned and rendered as an interactive D3.js force-directed graph
-
-## Project Structure
-
-```
-dti/
-├── server.js          # Express server + API routes
-├── public/
-│   └── index.html     # Frontend (single HTML file)
-├── package.json
-├── .env               # Your API key (not committed)
-└── README.md
-```
+- Scanned PDFs are not supported. Documents beyond 600 passages are cut, and the app says so.
+- For long documents the graph is built from the 40 passages most relevant to the focus; Ask searches all indexed passages.
+- Progress is saved in `data/` on the server. There are no user accounts, so run it locally.
+- The mastery parameters are standard starting values, not fitted to student data.
